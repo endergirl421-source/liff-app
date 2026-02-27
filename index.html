@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>อัปโหลดรูปลงระบบ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md p-6 mt-4">
+        <h2 class="text-2xl font-bold mb-4 text-center text-blue-600">☁️ ส่งรูปลง Google Drive</h2>
+
+        <div class="mb-6">
+            <label class="block text-gray-700 text-sm font-bold mb-2">เลือกรูปภาพ</label>
+            <input type="file" id="fileInput" accept="image/*" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+
+        <button id="uploadBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg">
+            📤 ยืนยันการอัปโหลด
+        </button>
+    </div>
+
+    <script>
+        // 🚨 จุดที่ 1: ต้องเอา LIFF ID ของคุณมาใส่ตรงนี้
+        const myLiffId = "2009260001-eJBgSAYH"; 
+        
+        // 🚨 จุดที่ 2: เอาลิงก์ Webhook ของ n8n (ลิงก์ Tailscale) มาใส่ตรงนี้
+        const n8nWebhookUrl = "https://laptop-tp9h962b.tail1bd7aa.ts.net/webhook-test/line-webhook";
+
+        // ฟังก์ชันเริ่มต้นการทำงานของ LINE
+        async function main() {
+            await liff.init({ liffId: myLiffId });
+            // ถ้าพนักงานยังไม่ได้ล็อกอิน ให้เด้งไปหน้าล็อกอิน LINE
+            if (!liff.isLoggedIn()) { liff.login(); }
+        }
+        main();
+
+        // เมื่อกดปุ่มอัปโหลด ให้ทำงานดังนี้
+        document.getElementById("uploadBtn").addEventListener("click", async () => {
+            const files = document.getElementById("fileInput").files;
+            if(files.length === 0) {
+                alert("กรุณาเลือกรูปก่อนครับ!");
+                return;
+            }
+            
+            const btn = document.getElementById("uploadBtn");
+            btn.innerText = "กำลังส่งรูป...";
+            btn.disabled = true;
+
+            // แพ็กไฟล์รูปใส่กล่องพัสดุชื่อ "data"
+            const formData = new FormData();
+            formData.append("data", files[0]);
+
+            try {
+                // ส่งรูปไปที่ n8n 
+                const response = await fetch(n8nWebhookUrl, {
+                    method: "POST",
+                    body: formData
+                });
+
+                if(response.ok) {
+                    alert("ส่งรูปลงระบบสำเร็จแล้ว!");
+                } else {
+                    alert("ส่งไม่สำเร็จ ลองใหม่อีกครั้งครับ");
+                }
+            } catch (error) {
+                alert("ไม่สามารถเชื่อมต่อได้ เช็คระบบหลังบ้านอีกครั้งครับ");
+            }
+
+            btn.innerText = "📤 ยืนยันการอัปโหลด";
+            btn.disabled = false;
+        });
+    </script>
+</body>
+</html>
