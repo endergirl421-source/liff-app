@@ -3,28 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>อัปโหลดรูปลงระบบ (ส่งหลายรูป)</title>
+    <title>อัปโหลดรูปลงระบบ (Queue Mode)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body class="bg-gray-100 p-4">
     <div class="max-w-md mx-auto bg-white rounded-xl shadow-md p-6 mt-4">
-        <h2 class="text-2xl font-bold mb-4 text-center text-blue-600">☁️ ส่งรูปลง Google Drive</h2>
+        <h2 class="text-2xl font-bold mb-4 text-center text-blue-600">☁️ ส่งรูปลง Google Drive (ทีละรูป)</h2>
 
         <div class="mb-6">
-            <label class="block text-gray-700 text-sm font-bold mb-2">เลือกรูปภาพ (เลือกได้หลายรูป)</label>
+            <label class="block text-gray-700 text-sm font-bold mb-2">เลือกรูปภาพ (เลือกได้หลายรูปพร้อมกัน)</label>
             <input type="file" id="fileInput" accept="image/*" multiple class="w-full px-3 py-2 border rounded-lg">
         </div>
 
-        <button id="uploadBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg">
+        <button id="uploadBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300">
             📤 ยืนยันการอัปโหลด
         </button>
-        <p id="statusText" class="text-center mt-3 text-sm text-gray-500"></p>
     </div>
 
     <script>
+        // 🚨 จุดที่ 1: LIFF ID ของคุณ
         const myLiffId = "2009260001-eJBgSAYH"; 
-        const n8nWebhookUrl = "https://klaadmin.tail1bd7aa.ts.net/n8n/webhook/line-webhook";
+        
+        // 🚨 จุดที่ 2: ลิงก์ Webhook ของ n8n
+        const n8nWebhookUrl = "https://laptop-tp9h962b.tail1bd7aa.ts.net/webhook-test/line-webhook";
+
+        // ฟังก์ชันช่วยสั่งให้ระบบหยุดรอ (Delay) หน่วยเป็นมิลลิวินาที
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         async function main() {
             await liff.init({ liffId: myLiffId });
@@ -32,6 +37,7 @@
         }
         main();
 
+        // เมื่อกดปุ่มอัปโหลด ให้ทำงานดังนี้
         document.getElementById("uploadBtn").addEventListener("click", async () => {
             const fileInput = document.getElementById("fileInput");
             const files = fileInput.files;
@@ -42,45 +48,52 @@
             }
             
             const btn = document.getElementById("uploadBtn");
-            const status = document.getElementById("statusText");
             btn.disabled = true;
-            
-            let successCount = 0;
+            btn.classList.replace("bg-blue-500", "bg-gray-400");
 
-            // 🚨 จุดที่แก้ 2: วน Loop ส่งทีละรูป เพื่อให้ n8n ประมวลผลเป็นรายการๆ ไป
+            // 🔄 เริ่มวนลูปส่งทีละรูปตามคิว
             for (let i = 0; i < files.length; i++) {
-                btn.innerText = `กำลังส่งรูปที่ ${i + 1}/${files.length}...`;
+                const currentFile = files[i];
+                const currentNumber = i + 1;
                 
+                // อัปเดตข้อความบนปุ่มบอกสถานะพนักงานว่ากำลังทำรูปที่เท่าไหร่
+                btn.innerText = `⏳ กำลังส่งรูปที่ ${currentNumber}/${files.length}...`;
+
                 const formData = new FormData();
-                formData.append("data", files[i]); // ส่งไฟล์ปัจจุบันในรอบ Loop
+                formData.append("data", currentFile);
 
                 try {
+                    // ส่งรูปปัจจุบันไปที่ n8n
                     const response = await fetch(n8nWebhookUrl, {
                         method: "POST",
                         body: formData
                     });
 
-                    if(response.ok) {
-                        successCount++;
+                    if(!response.ok) {
+                        console.error(`รูปที่ ${currentNumber} ส่งไม่สำเร็จ`);
                     }
                 } catch (error) {
-                    console.error("Error uploading file:", files[i].name);
+                    console.error(`เกิดข้อผิดพลาดในการเชื่อมต่อรูปที่ ${currentNumber}:`, error);
+                }
+
+                // ⏱️ เงื่อนไข: ถ้านี่ไม่ใช่รูปสุดท้าย ให้สั่งหยุดรอ 1 นาที (60000 มิลลิวินาที) ก่อนจะวนไปส่งรูปถัดไป
+                if (currentNumber < files.length) {
+                    let secondsLeft = 60;
+                    while (secondsLeft > 0) {
+                        btn.innerText = `⏳ ส่งรูปที่ ${currentNumber} แล้ว รอส่งรูปถัดไป (${secondsLeft} วิ)`;
+                        await delay(1000); // รอทีละ 1 วินาทีเพื่ออัปเดตตัวเลขถอยหลังบนปุ่ม
+                        secondsLeft--;
+                    }
                 }
             }
 
-            if(successCount === files.length) {
-                alert(`อัปโหลดสำเร็จครบทั้ง ${successCount} รูปแล้วครับ!`);
-            } else {
-                alert(`อัปโหลดสำเร็จ ${successCount} จาก ${files.length} รูป (เช็คระบบหลังบ้านอีกครั้งครับ)`);
-            }
-
+            // ทำงานเสร็จครบทุกรูปแล้ว
+            alert(`🎉 อัปโหลดครบทั้งหมด ${files.length} รูป เรียบร้อยแล้วครับ!`);
             btn.innerText = "📤 ยืนยันการอัปโหลด";
             btn.disabled = false;
-            fileInput.value = ""; // ล้างคิมที่เลือกไว้หลังส่งเสร็จ
+            btn.classList.replace("bg-gray-400", "bg-blue-500");
+            fileInput.value = ""; // ล้างไฟล์ออกจากช่อง
         });
     </script>
 </body>
 </html>
-
-
-
